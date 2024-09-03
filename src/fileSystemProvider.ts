@@ -208,8 +208,11 @@ export class MemFS implements vscode.FileSystemProvider {
 	readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._emitter.event;
 
 	watch(_resource: vscode.Uri): vscode.Disposable {
-		// ignore, fires for all changes...
-		return new vscode.Disposable(() => { });
+		// Implementation...
+		console.log('Watch functionality not implemented');
+		return new vscode.Disposable(() => {
+			console.log('Dispose of watch');
+		});
 	}
 
 	private _fireSoon(...events: vscode.FileChangeEvent[]): void {

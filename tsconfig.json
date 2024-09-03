@@ -7,7 +7,7 @@
 		"sourceMap": true,
 		"strict": true,
 		"rootDir": "src",
-		"types": ["node", "vscode", "mocha", "sinon"]
+		"types": ["node", "vscode", "mocha", "@types/sinon"]
 	},
 	"exclude": ["node_modules", ".vscode-test"]
 }

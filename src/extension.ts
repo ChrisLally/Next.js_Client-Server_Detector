@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 let statusBarItem: vscode.StatusBarItem;
-let clientFiles: string[] = [];
+const clientFiles = new Set<string>();
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Activating extension: nextjs-client-server-indicator');
@@ -34,36 +34,62 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
-	console.log('updateStatusBarItem called');
 	if (!editor) {
-		console.log('No active editor');
 		statusBarItem.hide();
 		return;
 	}
 
 	const document = editor.document;
-	console.log('Document URI:', document.uri.toString());
-	if (!isNextJsFile(document)) {
-		console.log('Not a Next.js file');
+	if (document.languageId !== 'typescript' && document.languageId !== 'javascript') {
 		statusBarItem.hide();
 		return;
 	}
 
-	const result = await isClientFile(document.uri);
-	const isClientComponent = result.isClient;
-	clientFiles = result.clientFiles;
-	console.log('Is client component:', isClientComponent);
-	statusBarItem.text = isClientComponent ? 'Client' : 'Server';
+	const fileContent = document.getText();
+	const isClientComponent = fileContent.includes("'use client'") || fileContent.includes('"use client"');
+	const detectedRoute = detectRoute(document.fileName);
+
+	if (isClientComponent) {
+		statusBarItem.text = `Client${detectedRoute ? ` | ${detectedRoute}` : ''}`;
+		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+	} else {
+		statusBarItem.text = `Server${detectedRoute ? ` | ${detectedRoute}` : ''}`;
+		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+	}
+
 	statusBarItem.show();
-	console.log('Status bar item text set to:', statusBarItem.text);
 }
 
-function isNextJsFile(document: vscode.TextDocument): boolean {
-	const supportedExtensions = ['.js', '.jsx', '.ts', '.tsx'];
-	const supportedLanguages = ['javascript', 'typescript', 'javascriptreact', 'typescriptreact'];
-	return supportedExtensions.includes(path.extname(document.fileName)) || 
-           supportedLanguages.includes(document.languageId);
+function detectRoute(filePath: string): string | null {
+	// Assuming the project follows Next.js 13+ app directory structure
+	const appDirIndex = filePath.indexOf('app');
+	if (appDirIndex === -1) return null;
+
+	const relativePath = filePath.slice(appDirIndex + 4); // +4 to skip 'app/'
+	const parts = relativePath.split(path.sep);
+
+	// Filter out special Next.js file names and folders
+	const routeParts = parts.filter(part => 
+		!['page.tsx', 'page.js', 'layout.tsx', 'layout.js', '(...)'].some(specialName => 
+			part.includes(specialName)
+		)
+	);
+
+	// Join the remaining parts to form the route
+	const route = '/' + routeParts.join('/');
+
+	return route || null;
 }
+
+// TODO: Implement or remove these unused functions
+// function isNextJsFile(document: vscode.TextDocument): boolean {
+//     // Implementation...
+// }
+
+// Remove this function if it's no longer used
+// function isClientFile(document: vscode.TextDocument): boolean {
+//     // Implementation...
+// }
 
 async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): Promise<{ isClient: boolean, clientFiles: string[] }> {
 	console.log('Checking if file is client:', uri.toString());
@@ -137,12 +163,12 @@ async function resolveImportPath(baseUri: vscode.Uri, importPath: string): Promi
 }
 
 async function showClientFiles() {
-	if (clientFiles.length === 0) {
+	if (clientFiles.size === 0) {
 		vscode.window.showInformationMessage('No client-side files found.');
 		return;
 	}
 
-	const items = clientFiles.map(file => ({
+	const items = Array.from(clientFiles).map(file => ({
 		label: path.basename(file),
 		description: vscode.workspace.asRelativePath(file),
 		file: file
@@ -158,4 +184,7 @@ async function showClientFiles() {
 	}
 }
 
-export function deactivate() {}
+export function deactivate() {
+    // Perform any cleanup tasks here
+    console.log('Extension deactivated');
+}
