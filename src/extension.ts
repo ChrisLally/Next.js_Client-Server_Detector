@@ -26,6 +26,15 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.onDidChangeActiveTextEditor(updateStatusBarItem)
 	);
 
+	// Listen for configuration changes
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration(event => {
+			if (event.affectsConfiguration('nextjs-client-server-indicator')) {
+				updateStatusBarItem(vscode.window.activeTextEditor);
+			}
+		})
+	);
+
 	// Update status bar item immediately
 	updateStatusBarItem(vscode.window.activeTextEditor);
 
@@ -70,11 +79,25 @@ async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
 
 	newClientFiles.forEach(file => clientFiles.add(file));
 
+	const config = vscode.workspace.getConfiguration('nextjs-client-server-indicator');
+
 	if (isClient) {
 		statusBarItem.text = 'Client';
+		const clientColor = config.get<string>('clientColor');
+		if (clientColor) {
+			statusBarItem.color = clientColor;
+		} else {
+			statusBarItem.color = undefined; // Reset to default color
+		}
 		console.log('Set status: Client');
 	} else {
 		statusBarItem.text = 'Server';
+		const serverColor = config.get<string>('serverColor');
+		if (serverColor) {
+			statusBarItem.color = serverColor;
+		} else {
+			statusBarItem.color = undefined; // Reset to default color
+		}
 		console.log('Set status: Server');
 	}
 

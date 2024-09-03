@@ -27,7 +27,24 @@
 				"command": "nextjs-client-server-indicator.showClientFiles",
 				"title": "Show Client Files"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Next.js Client/Server Indicator",
+			"properties": {
+				"nextjs-client-server-indicator.clientColor": {
+					"type": "string",
+					"default": "",
+					"description": "Color for Client components in the status bar",
+					"format": "color"
+				},
+				"nextjs-client-server-indicator.serverColor": {
+					"type": "string",
+					"default": "",
+					"description": "Color for Server components in the status bar",
+					"format": "color"
+				}
+			}
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
