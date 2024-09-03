@@ -14,6 +14,18 @@ class NextJSFileDecorationProvider implements vscode.FileDecorationProvider {
 	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this._onDidChangeFileDecorations.event;
 
 	async provideFileDecoration(uri: vscode.Uri): Promise<vscode.FileDecoration | undefined> {
+		const config = vscode.workspace.getConfiguration('nextjs-client-server-indicator');
+		const showBadges = config.get<boolean>('showBadges', true);
+
+		if (!showBadges) {
+			return undefined;
+		}
+
+		const stat = await vscode.workspace.fs.stat(uri);
+		if (stat.type === vscode.FileType.Directory) {
+			return undefined;
+		}
+
 		const { isClient } = await isClientFile(uri);
 		return isClient ? { badge: 'C' } : { badge: 'S' };
 	}
@@ -51,7 +63,21 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration(event => {
 			if (event.affectsConfiguration('nextjs-client-server-indicator')) {
+				const action = 'Reload Window';
+				vscode.window.showInformationMessage(
+					'Next.js Client/Server Indicator settings have changed. Reload the window for the changes to take effect?',
+					action
+				).then(selectedAction => {
+					if (selectedAction === action) {
+						vscode.commands.executeCommand('workbench.action.reloadWindow');
+					}
+				});
+
+				// We can still update these immediately for some visual feedback
 				updateStatusBarItem(vscode.window.activeTextEditor);
+				vscode.window.visibleTextEditors.forEach(editor => {
+					decorationProvider.updateDecoration(editor.document.uri);
+				});
 			}
 		})
 	);
@@ -83,6 +109,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
 	console.log('Updating status bar item');
+	const config = vscode.workspace.getConfiguration('nextjs-client-server-indicator');
+	const showStatusBar = config.get<boolean>('showStatusBar', true);
+
+	if (!showStatusBar) {
+		statusBarItem.hide();
+		return;
+	}
+
 	if (!editor) {
 		console.log('No active editor');
 		// Don't change the text, keep the last known state
@@ -100,8 +134,6 @@ async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
 	console.log('newClientFiles:', newClientFiles);
 
 	newClientFiles.forEach(file => clientFiles.add(file));
-
-	const config = vscode.workspace.getConfiguration('nextjs-client-server-indicator');
 
 	if (isClient) {
 		statusBarItem.text = 'Client';
