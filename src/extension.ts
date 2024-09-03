@@ -9,6 +9,22 @@ const clientFiles = new Set<string>();
 
 let updateTimer: NodeJS.Timeout | undefined;
 
+class NextJSFileDecorationProvider implements vscode.FileDecorationProvider {
+	private _onDidChangeFileDecorations: vscode.EventEmitter<vscode.Uri | vscode.Uri[]> = new vscode.EventEmitter<vscode.Uri | vscode.Uri[]>();
+	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this._onDidChangeFileDecorations.event;
+
+	async provideFileDecoration(uri: vscode.Uri): Promise<vscode.FileDecoration | undefined> {
+		const { isClient } = await isClientFile(uri);
+		return isClient ? { badge: 'C' } : { badge: 'S' };
+	}
+
+	updateDecoration(uri: vscode.Uri) {
+		this._onDidChangeFileDecorations.fire(uri);
+	}
+}
+
+const decorationProvider = new NextJSFileDecorationProvider();
+
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Activating extension: nextjs-client-server-indicator');
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -24,6 +40,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.window.onDidChangeActiveTextEditor(updateStatusBarItem)
+	);
+
+	// Register the file decoration provider
+	context.subscriptions.push(
+		vscode.window.registerFileDecorationProvider(decorationProvider)
 	);
 
 	// Listen for configuration changes
@@ -48,6 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 				updateTimer = setTimeout(() => {
 					updateStatusBarItem(vscode.window.activeTextEditor);
+					decorationProvider.updateDecoration(event.document.uri);
 				}, 500); // 500ms delay
 			}
 		})
@@ -102,6 +124,11 @@ async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
 	}
 
 	console.log('Status bar updated:', statusBarItem.text);
+
+	// After updating the status bar, also update the file decoration
+	if (editor) {
+		decorationProvider.updateDecoration(editor.document.uri);
+	}
 }
 
 function detectRoute(filePath: string): string | null {
