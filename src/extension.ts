@@ -12,6 +12,8 @@ let updateTimer: NodeJS.Timeout | undefined;
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Activating extension: nextjs-client-server-indicator');
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.text = 'Analyzing...'; // Set initial text
+	statusBarItem.show(); // Show the status bar item immediately
 	context.subscriptions.push(statusBarItem);
 
 	statusBarItem.command = 'nextjs-client-server-indicator.showClientFiles';
@@ -52,12 +54,15 @@ async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
 	console.log('Updating status bar item');
 	if (!editor) {
 		console.log('No active editor');
-		statusBarItem.hide();
+		// Don't change the text, keep the last known state
 		return;
 	}
 
 	const document = editor.document;
 	console.log('Current file:', document.fileName);
+
+	// Set the text to "Analyzing..." while we determine the new state
+	statusBarItem.text = 'Analyzing...';
 
 	const { isClient, clientFiles: newClientFiles } = await isClientFile(document.uri);
 	console.log('isClient:', isClient);
@@ -67,15 +72,12 @@ async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
 
 	if (isClient) {
 		statusBarItem.text = 'Client';
-		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
 		console.log('Set status: Client');
 	} else {
 		statusBarItem.text = 'Server';
-		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
 		console.log('Set status: Server');
 	}
 
-	statusBarItem.show();
 	console.log('Status bar updated:', statusBarItem.text);
 }
 
