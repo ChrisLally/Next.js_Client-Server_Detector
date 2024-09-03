@@ -7,6 +7,8 @@ import * as path from 'path';
 let statusBarItem: vscode.StatusBarItem;
 const clientFiles = new Set<string>();
 
+let updateTimer: NodeJS.Timeout | undefined;
+
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Activating extension: nextjs-client-server-indicator');
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -27,6 +29,19 @@ export function activate(context: vscode.ExtensionContext) {
 
 	console.log('Extension activated successfully');
 
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeTextDocument((event) => {
+			if (event.document === vscode.window.activeTextEditor?.document) {
+				if (updateTimer) {
+					clearTimeout(updateTimer);
+				}
+				updateTimer = setTimeout(() => {
+					updateStatusBarItem(vscode.window.activeTextEditor);
+				}, 500); // 500ms delay
+			}
+		})
+	);
+
 	return {
 		getStatusBarItem: () => statusBarItem,
 		updateStatusBarItem: updateStatusBarItem // Export this function for testing
@@ -34,30 +49,34 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
+	console.log('Updating status bar item');
 	if (!editor) {
+		console.log('No active editor');
 		statusBarItem.hide();
 		return;
 	}
 
 	const document = editor.document;
-	if (document.languageId !== 'typescript' && document.languageId !== 'javascript') {
-		statusBarItem.hide();
-		return;
-	}
+	console.log('Current file:', document.fileName);
 
-	const fileContent = document.getText();
-	const isClientComponent = fileContent.includes("'use client'") || fileContent.includes('"use client"');
-	const detectedRoute = detectRoute(document.fileName);
+	const { isClient, clientFiles: newClientFiles } = await isClientFile(document.uri);
+	console.log('isClient:', isClient);
+	console.log('newClientFiles:', newClientFiles);
 
-	if (isClientComponent) {
-		statusBarItem.text = `Client${detectedRoute ? ` | ${detectedRoute}` : ''}`;
+	newClientFiles.forEach(file => clientFiles.add(file));
+
+	if (isClient) {
+		statusBarItem.text = 'Client';
 		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+		console.log('Set status: Client');
 	} else {
-		statusBarItem.text = `Server${detectedRoute ? ` | ${detectedRoute}` : ''}`;
+		statusBarItem.text = 'Server';
 		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+		console.log('Set status: Server');
 	}
 
 	statusBarItem.show();
+	console.log('Status bar updated:', statusBarItem.text);
 }
 
 function detectRoute(filePath: string): string | null {
@@ -81,16 +100,6 @@ function detectRoute(filePath: string): string | null {
 	return route || null;
 }
 
-// TODO: Implement or remove these unused functions
-// function isNextJsFile(document: vscode.TextDocument): boolean {
-//     // Implementation...
-// }
-
-// Remove this function if it's no longer used
-// function isClientFile(document: vscode.TextDocument): boolean {
-//     // Implementation...
-// }
-
 async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): Promise<{ isClient: boolean, clientFiles: string[] }> {
 	console.log('Checking if file is client:', uri.toString());
 	const filePath = uri.fsPath;
@@ -103,24 +112,28 @@ async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): 
 
 	let text: string;
 	if (uri.scheme === 'untitled') {
-		// For untitled documents, get the content from the TextDocument
 		const document = await vscode.workspace.openTextDocument(uri);
 		text = document.getText();
 	} else {
-		// For saved files, use fs.readFile
-		const content = await vscode.workspace.fs.readFile(uri);
-		text = new TextDecoder().decode(content);
+		try {
+			const content = await vscode.workspace.fs.readFile(uri);
+			text = new TextDecoder().decode(content);
+		} catch (error) {
+			console.error(`Error reading file ${uri.toString()}:`, error);
+			return { isClient: false, clientFiles: [] };
+		}
 	}
 
-	console.log('File content:', text);
+	console.log('File content (first 200 characters):', text.substring(0, 200));
 
-	// Check for 'use client' directive
-	if (text.trim().startsWith("'use client'") || text.trim().startsWith('"use client"')) {
+	// Check for 'use client' directive, ignoring comments and whitespace
+	const useClientRegex = /^\s*['"]use client['"]\s*;?/m;
+	if (useClientRegex.test(text)) {
 		console.log('Found "use client" directive');
 		return { isClient: true, clientFiles: [filePath] };
 	}
 
-	console.log('No "use client" directive found');
+	console.log('No "use client" directive found, checking imports');
 
 	// Check imports
 	const importRegex = /import.*from\s+['"](.+)['"]/g;
@@ -128,16 +141,22 @@ async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): 
 	let allClientFiles: string[] = [];
 	while ((match = importRegex.exec(text)) !== null) {
 		const importPath = match[1];
+		console.log('Found import:', importPath);
 		const resolvedPath = await resolveImportPath(uri, importPath);
 		if (resolvedPath) {
+			console.log('Resolved import path:', resolvedPath.toString());
 			const result = await isClientFile(resolvedPath, visited);
 			if (result.isClient) {
 				allClientFiles = allClientFiles.concat(result.clientFiles);
 			}
+		} else {
+			console.log('Could not resolve import path:', importPath);
 		}
 	}
 
-	return { isClient: allClientFiles.length > 0, clientFiles: allClientFiles };
+	const isClient = allClientFiles.length > 0;
+	console.log('File is client:', isClient);
+	return { isClient, clientFiles: allClientFiles };
 }
 
 async function resolveImportPath(baseUri: vscode.Uri, importPath: string): Promise<vscode.Uri | undefined> {
