@@ -1,33 +1,42 @@
-# Next.js Client/Server File Indicator
+# Next.js Client/Server Indicator
 
-This extension adds a status bar indicator to show whether a file is a client-side or server-side component in Next.js projects.
+This Visual Studio Code extension provides a status bar indicator for Next.js projects, showing whether the current file is a client-side or server-side component. It now also includes route detection for Next.js 13+ app directory structure.
 
 ## Features
 
-* Displays a status bar indicator for each open file in a Next.js project
-* Automatically detects whether a file is a client-side or server-side component
-* Recursively checks imports to determine client/server status
+- Status bar indicator showing "Client" or "Server" for Next.js components.
+- Route detection for Next.js 13+ app directory structure.
+- Works with TypeScript and JavaScript files.
+- Automatically updates as you switch between files.
 
 ## How it works
 
-The extension checks for the following to determine if a file is a client-side component:
+The extension analyzes the content of your current file:
+- If it contains `'use client'` or `"use client"`, it's marked as a Client component.
+- Otherwise, it's considered a Server component.
+- For files within the `app` directory, the extension also attempts to detect and display the corresponding route.
 
-1. Presence of the 'use client' directive at the top of the file
-2. If any direct imports are client-side components
-3. If any nested imports (imports of imports) are client-side components
+## Requirements
 
-If none of these conditions are met, the file is considered a server-side component.
+- Visual Studio Code v1.60.0 or higher
+- Next.js project (optimized for Next.js 13+ with app directory structure)
 
-## Getting Started
+## Extension Settings
 
-1. Install this extension
-2. Open a Next.js project in VS Code
-3. Open any .js, .jsx, .ts, or .tsx file
-4. Look at the status bar to see whether the current file is a client-side or server-side component
+This extension does not add any VS Code settings.
 
-## Usage
+## Known Issues
 
-The status bar will display one of the following indicators:
+[List any known issues here, or remove this section if there are none]
 
-* `Client`: The current file is a client-side component
-* `Server`: The current file is a server-side component
+## Release Notes
+
+See the [CHANGELOG.md](CHANGELOG.md) file for detailed release notes.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+[Include your license information here]
