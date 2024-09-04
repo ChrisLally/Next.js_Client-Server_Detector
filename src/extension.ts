@@ -7,9 +7,41 @@ import * as path from 'path';
 let statusBarItem: vscode.StatusBarItem;
 const clientFiles = new Set<string>();
 
+let updateTimer: NodeJS.Timeout | undefined;
+
+class NextJSFileDecorationProvider implements vscode.FileDecorationProvider {
+	private _onDidChangeFileDecorations: vscode.EventEmitter<vscode.Uri | vscode.Uri[]> = new vscode.EventEmitter<vscode.Uri | vscode.Uri[]>();
+	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this._onDidChangeFileDecorations.event;
+
+	async provideFileDecoration(uri: vscode.Uri): Promise<vscode.FileDecoration | undefined> {
+		const config = vscode.workspace.getConfiguration('nextjs-client-server-indicator');
+		const showBadges = config.get<boolean>('showBadges', true);
+
+		if (!showBadges) {
+			return undefined;
+		}
+
+		const stat = await vscode.workspace.fs.stat(uri);
+		if (stat.type === vscode.FileType.Directory) {
+			return undefined;
+		}
+
+		const { isClient } = await isClientFile(uri);
+		return isClient ? { badge: 'C' } : { badge: 'S' };
+	}
+
+	updateDecoration(uri: vscode.Uri) {
+		this._onDidChangeFileDecorations.fire(uri);
+	}
+}
+
+const decorationProvider = new NextJSFileDecorationProvider();
+
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Activating extension: nextjs-client-server-indicator');
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.text = 'Analyzing...'; // Set initial text
+	statusBarItem.show(); // Show the status bar item immediately
 	context.subscriptions.push(statusBarItem);
 
 	statusBarItem.command = 'nextjs-client-server-indicator.showClientFiles';
@@ -22,10 +54,52 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.onDidChangeActiveTextEditor(updateStatusBarItem)
 	);
 
+	// Register the file decoration provider
+	context.subscriptions.push(
+		vscode.window.registerFileDecorationProvider(decorationProvider)
+	);
+
+	// Listen for configuration changes
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeConfiguration(event => {
+			if (event.affectsConfiguration('nextjs-client-server-indicator')) {
+				const action = 'Reload Window';
+				vscode.window.showInformationMessage(
+					'Next.js Client/Server Indicator settings have changed. Reload the window for the changes to take effect?',
+					action
+				).then(selectedAction => {
+					if (selectedAction === action) {
+						vscode.commands.executeCommand('workbench.action.reloadWindow');
+					}
+				});
+
+				// We can still update these immediately for some visual feedback
+				updateStatusBarItem(vscode.window.activeTextEditor);
+				vscode.window.visibleTextEditors.forEach(editor => {
+					decorationProvider.updateDecoration(editor.document.uri);
+				});
+			}
+		})
+	);
+
 	// Update status bar item immediately
 	updateStatusBarItem(vscode.window.activeTextEditor);
 
 	console.log('Extension activated successfully');
+
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeTextDocument((event) => {
+			if (event.document === vscode.window.activeTextEditor?.document) {
+				if (updateTimer) {
+					clearTimeout(updateTimer);
+				}
+				updateTimer = setTimeout(() => {
+					updateStatusBarItem(vscode.window.activeTextEditor);
+					decorationProvider.updateDecoration(event.document.uri);
+				}, 500); // 500ms delay
+			}
+		})
+	);
 
 	return {
 		getStatusBarItem: () => statusBarItem,
@@ -34,30 +108,59 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function updateStatusBarItem(editor: vscode.TextEditor | undefined) {
-	if (!editor) {
+	console.log('Updating status bar item');
+	const config = vscode.workspace.getConfiguration('nextjs-client-server-indicator');
+	const showStatusBar = config.get<boolean>('showStatusBar', true);
+
+	if (!showStatusBar) {
 		statusBarItem.hide();
+		return;
+	}
+
+	if (!editor) {
+		console.log('No active editor');
+		// Don't change the text, keep the last known state
 		return;
 	}
 
 	const document = editor.document;
-	if (document.languageId !== 'typescript' && document.languageId !== 'javascript') {
-		statusBarItem.hide();
-		return;
-	}
+	console.log('Current file:', document.fileName);
 
-	const fileContent = document.getText();
-	const isClientComponent = fileContent.includes("'use client'") || fileContent.includes('"use client"');
-	const detectedRoute = detectRoute(document.fileName);
+	// Set the text to "Analyzing..." while we determine the new state
+	statusBarItem.text = 'Analyzing...';
 
-	if (isClientComponent) {
-		statusBarItem.text = `Client${detectedRoute ? ` | ${detectedRoute}` : ''}`;
-		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+	const { isClient, clientFiles: newClientFiles } = await isClientFile(document.uri);
+	console.log('isClient:', isClient);
+	console.log('newClientFiles:', newClientFiles);
+
+	newClientFiles.forEach(file => clientFiles.add(file));
+
+	if (isClient) {
+		statusBarItem.text = 'Client';
+		const clientColor = config.get<string>('clientColor');
+		if (clientColor) {
+			statusBarItem.color = clientColor;
+		} else {
+			statusBarItem.color = undefined; // Reset to default color
+		}
+		console.log('Set status: Client');
 	} else {
-		statusBarItem.text = `Server${detectedRoute ? ` | ${detectedRoute}` : ''}`;
-		statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+		statusBarItem.text = 'Server';
+		const serverColor = config.get<string>('serverColor');
+		if (serverColor) {
+			statusBarItem.color = serverColor;
+		} else {
+			statusBarItem.color = undefined; // Reset to default color
+		}
+		console.log('Set status: Server');
 	}
 
-	statusBarItem.show();
+	console.log('Status bar updated:', statusBarItem.text);
+
+	// After updating the status bar, also update the file decoration
+	if (editor) {
+		decorationProvider.updateDecoration(editor.document.uri);
+	}
 }
 
 function detectRoute(filePath: string): string | null {
@@ -81,16 +184,6 @@ function detectRoute(filePath: string): string | null {
 	return route || null;
 }
 
-// TODO: Implement or remove these unused functions
-// function isNextJsFile(document: vscode.TextDocument): boolean {
-//     // Implementation...
-// }
-
-// Remove this function if it's no longer used
-// function isClientFile(document: vscode.TextDocument): boolean {
-//     // Implementation...
-// }
-
 async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): Promise<{ isClient: boolean, clientFiles: string[] }> {
 	console.log('Checking if file is client:', uri.toString());
 	const filePath = uri.fsPath;
@@ -103,24 +196,28 @@ async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): 
 
 	let text: string;
 	if (uri.scheme === 'untitled') {
-		// For untitled documents, get the content from the TextDocument
 		const document = await vscode.workspace.openTextDocument(uri);
 		text = document.getText();
 	} else {
-		// For saved files, use fs.readFile
-		const content = await vscode.workspace.fs.readFile(uri);
-		text = new TextDecoder().decode(content);
+		try {
+			const content = await vscode.workspace.fs.readFile(uri);
+			text = new TextDecoder().decode(content);
+		} catch (error) {
+			console.error(`Error reading file ${uri.toString()}:`, error);
+			return { isClient: false, clientFiles: [] };
+		}
 	}
 
-	console.log('File content:', text);
+	console.log('File content (first 200 characters):', text.substring(0, 200));
 
-	// Check for 'use client' directive
-	if (text.trim().startsWith("'use client'") || text.trim().startsWith('"use client"')) {
+	// Check for 'use client' directive, ignoring comments and whitespace
+	const useClientRegex = /^\s*['"]use client['"]\s*;?/m;
+	if (useClientRegex.test(text)) {
 		console.log('Found "use client" directive');
 		return { isClient: true, clientFiles: [filePath] };
 	}
 
-	console.log('No "use client" directive found');
+	console.log('No "use client" directive found, checking imports');
 
 	// Check imports
 	const importRegex = /import.*from\s+['"](.+)['"]/g;
@@ -128,16 +225,22 @@ async function isClientFile(uri: vscode.Uri, visited: Set<string> = new Set()): 
 	let allClientFiles: string[] = [];
 	while ((match = importRegex.exec(text)) !== null) {
 		const importPath = match[1];
+		console.log('Found import:', importPath);
 		const resolvedPath = await resolveImportPath(uri, importPath);
 		if (resolvedPath) {
+			console.log('Resolved import path:', resolvedPath.toString());
 			const result = await isClientFile(resolvedPath, visited);
 			if (result.isClient) {
 				allClientFiles = allClientFiles.concat(result.clientFiles);
 			}
+		} else {
+			console.log('Could not resolve import path:', importPath);
 		}
 	}
 
-	return { isClient: allClientFiles.length > 0, clientFiles: allClientFiles };
+	const isClient = allClientFiles.length > 0;
+	console.log('File is client:', isClient);
+	return { isClient, clientFiles: allClientFiles };
 }
 
 async function resolveImportPath(baseUri: vscode.Uri, importPath: string): Promise<vscode.Uri | undefined> {

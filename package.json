@@ -8,6 +8,7 @@
 		"type": "git",
 		"url": "https://github.com/ChrisLally/Next.js_Client-Server_Detector.git"
 	},
+	"icon": "media/CLIENT-SERVER-128.png",
 	"engines": {
 		"vscode": "^1.74.0"
 	},
@@ -27,7 +28,34 @@
 				"command": "nextjs-client-server-indicator.showClientFiles",
 				"title": "Show Client Files"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Next.js Client/Server Indicator",
+			"properties": {
+				"nextjs-client-server-indicator.clientColor": {
+					"type": "string",
+					"default": "",
+					"description": "Color for Client components in the status bar",
+					"format": "color"
+				},
+				"nextjs-client-server-indicator.serverColor": {
+					"type": "string",
+					"default": "",
+					"description": "Color for Server components in the status bar",
+					"format": "color"
+				},
+				"nextjs-client-server-indicator.showBadges": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show 'C' and 'S' badges on file icons"
+				},
+				"nextjs-client-server-indicator.showStatusBar": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show 'Client' or 'Server' indicator in the status bar"
+				}
+			}
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
