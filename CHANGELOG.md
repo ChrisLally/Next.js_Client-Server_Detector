@@ -1,10 +1,6 @@
 # Change Log
 All notable changes to the "nextjs-client-server-indicator" extension will be documented in this file.
 
-Check [Keep a Changelog](https://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
 ### Added
 - Route detection feature for Next.js 13+ app directory structure.
 - New test cases for route detection functionality.

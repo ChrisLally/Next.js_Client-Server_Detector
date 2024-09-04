@@ -8,6 +8,7 @@
 		"type": "git",
 		"url": "https://github.com/ChrisLally/Next.js_Client-Server_Detector.git"
 	},
+	"icon": "media/CLIENT-SERVER-128.png",
 	"engines": {
 		"vscode": "^1.74.0"
 	},

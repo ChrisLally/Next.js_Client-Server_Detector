@@ -2,6 +2,16 @@
 
 This Visual Studio Code extension provides visual indicators for Next.js projects, showing whether a file is a client-side or server-side component, and detecting routes for Next.js 13+ app directory structure.
 
+## Screenshot
+
+![Next.js Client/Server Indicator Screenshot](media/Next-js-ClientServer-Indicator-1280.jpg)
+
+## Demo Video
+
+Check out our demo video to see the extension in action:
+
+[![Next.js Client/Server Indicator Demo](https://img.youtube.com/vi/nhOZ1gkwaY8/0.jpg)](https://www.youtube.com/watch?v=nhOZ1gkwaY8)
+
 ## Features
 
 - Status bar indicator showing "Client" or "Server" for Next.js components.
@@ -34,10 +44,6 @@ This extension contributes the following settings:
 
 Note: After changing these settings, you will be prompted to reload the VS Code window for the changes to take full effect.
 
-## Known Issues
-
-[List any known issues here, or remove this section if there are none]
-
 ## Release Notes
 
 See the [CHANGELOG.md](CHANGELOG.md) file for detailed release notes.
@@ -50,4 +56,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under a custom license that allows free personal use but requires contacting the author for commercial use. See the [LICENSE.txt](LICENSE.txt) file for details.
 
-For commercial use inquiries, please contact Chris Lally at [your contact information].
+For commercial use inquiries, please contact the author (Chris Lally) to obtain a commercial license.
