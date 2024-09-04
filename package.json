@@ -13,7 +13,20 @@
 		"vscode": "^1.74.0"
 	},
 	"categories": [
+		"Programming Languages",
+		"Visualization",
+		"Formatters",
 		"Other"
+	],
+	"keywords": [
+		"nextjs",
+		"react",
+		"client",
+		"server",
+		"components",
+		"indicator",
+		"typescript",
+		"javascript"
 	],
 	"activationEvents": [
 		"onLanguage:javascript",
